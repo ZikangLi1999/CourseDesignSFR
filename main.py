@@ -5,6 +5,14 @@ Course: NU317 Thermodynamic Design and Practise
 Author: Zikang Li
 Date: 2021 Spring
 """
+import pip
+
+modules = ["thermostate", "matplotlib", "numpy", "colorama"]
+try:
+    for module in modules:
+        pip.main(["install", module])
+except:
+    print("Pip Failed.")
 
 from iteration import inner_iteration
 import optimization

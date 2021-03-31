@@ -65,6 +65,8 @@ def inner_iteration(para, graph=False, print_all=False):
     state[9] = nitrogen(p=state[1].p, s=state[8].s)
 
     # Equivalent enthalpy rise
+    if min(para['t10'], para['t11'], para['t12']) <= state[9].t:
+        raise ValueError("Temperatures Decrease.")
     state[10] = nitrogen(p=state[1].p, t=para['t10'])
     state[11] = nitrogen(p=state[10].p, t=para['t11'])
     state[12] = nitrogen(p=state[11].p, t=para['t12'])
@@ -92,7 +94,6 @@ def inner_iteration(para, graph=False, print_all=False):
     # flow = alpha * Q * (state[1].h - state[12].h)
 
     # Check legality of results
-    '''
     for result in [alpha, beta, *r, eff]:
         if result <= 0 or result >= 1:
             raise ValueError("Illegal result.")
@@ -100,7 +101,6 @@ def inner_iteration(para, graph=False, print_all=False):
         raise ValueError("Illegal result.")
     if r[0] >= beta:
         raise ValueError("Illegal result.")
-        '''
     
     # Print key parameters
     print("\nalpha = {:.4f}".format(alpha))

@@ -77,8 +77,10 @@ class GreedyAlgo(object):
                 if score > self.best_score:
                     self.best[i] = value
                     self.best_score = score
+                '''
                 if isclose(score, 0.3037, abs_tol=0.0001):
-                    return self.__encode__(self.best)
+                    return self.__encode__(temp)
+                '''
         return self.__encode__(self.best)
     
     def get_best(self, best=None):
