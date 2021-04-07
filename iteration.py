@@ -44,7 +44,7 @@ equip = {
 
 # Inner Iteration
 # state_para, gasp_para, link_para !!!
-def inner_iteration(para, graph=False, print_all=False):
+def inner_iteration(para, graph=False, print_key=True, print_all=False):
     r = [0.0 for i in range(2)]
     # Define states of the key points
     # state[0] is useless (just for more readable index).
@@ -61,12 +61,13 @@ def inner_iteration(para, graph=False, print_all=False):
     state[5] = nitrogen(p=state[4].p, t=para['t5'])
     state[6] = nitrogen(p=state[5].p, t=para['t6'])
     state[7] = nitrogen(p=equip['lpc_ratio']*state[6].p, s=state[6].s)
-    state[8] = nitrogen(p=state[7].p, t=para['t8'])
-    state[9] = nitrogen(p=state[1].p, s=state[8].s)
+
+    if para['ptr1']*(state[1].t-state[2].t)+state[2].t < state_gasp[0].t or state[2].t > state_gasp[0].t:
+        raise ValueError("HPT out of range.")
+    if state[3].t < state_gasp[1].t or para['ptr2']*(state[3].t-state[4].t)+state[4].t > state_gasp[1].t:
+        raise ValueError("LPT out of range.")
 
     # Equivalent enthalpy rise
-    if min(para['t10'], para['t11'], para['t12']) <= state[9].t:
-        raise ValueError("Temperatures Decrease.")
     state[10] = nitrogen(p=state[1].p, t=para['t10'])
     state[11] = nitrogen(p=state[10].p, t=para['t11'])
     state[12] = nitrogen(p=state[11].p, t=para['t12'])
@@ -74,28 +75,49 @@ def inner_iteration(para, graph=False, print_all=False):
     # 1-2 & 2-3
     state_link.append(nitrogen(p=state_gasp[0].p, t=state_gasp[1].t))
     state_link.append(nitrogen(p=state_gasp[1].p, t=state[4].t))
+    # state_link.append(nitrogen(p=state_gasp[0].p, t=para['tk1']))
+    # state_link.append(nitrogen(p=state_gasp[1].p, t=para['tk2']))
+
+    # if not (state_link[1].t > state[5].t and state_link[1].t > state[10].t and state_link[1].t < state_gasp[1].t):
+    #     raise ValueError("Link[1] Temp.")
+    # if not (state_link[0].t > state[11].t and state_link[0].t < state_gasp[0].t and state_link[1].t < state_link[0].t):
+    #     raise ValueError("Link[0] Temp.")
+
+    # Calculate r1, r2
+    r[0] = (state[12].h - state[11].h)\
+        / (state_gasp[0].h - state_link[0].h)
+    r[1] = (state[11].h - state[10].h - r[0] * (state_link[0].h - state_link[1].h))\
+        / (state_gasp[1].h - state_link[1].h)
+
+    state[9] = nitrogen(p=state[1].p, h=state[10].h - ((1 - r[0] - r[1]) * (state[4].h - state[5].h) + (r[0] + r[1]) * (state_link[1].h - state[5].h)))
+    state[8] = nitrogen(p=state[7].p, s=state[9].s)
+
+    if state[9].t > para['t10'] or para['t10'] > para['t11'] or para['t11'] > para['t12']:
+        raise ValueError("Temperatures Decrease.")
+    if state[9].t >state[5].t:
+        raise ValueError("R3 boomed.")
+    # rise1 = (state[10].h - state[9].h) / (state[11].h - state[10].h)
+    # rise2 = (state[11].h - state[10].h) / (state[12].h - state[11].h)
+    # if not (rise1 > 0.1 and rise1 < 10.0 and rise2 > 0.1 and rise2 < 10.0):
+    #     raise ValueError("Temperature Jump.")
 
     # Turbines and Compressers
     lpc = state[7].h - state[6].h
     hpc = state[9].h - state[8].h
     lpt = (1 - r[0]) * (state[3].h - state[4].h) - r[1] * (state_gasp[1].h - state[4].h)
 
-    # Calculate alpha, beta, r1, r2 and mass flow of N2
+    # Calculate alpha, beta
     alpha = 1 / (((1 - r[0]) * (state[3].h - state[2].h)\
         / (state[1].h - state[12].h)) + 1)
     beta = (r[0] * (state_gasp[0].h - state[2].h) + (lpc + hpc - lpt))\
         / (state[1].h - state[2].h)
-    r[0] = (state[12].h - state[11].h)\
-        / (state_gasp[0].h - state_link[0].h)
-    r[1] = (state[11].h - state[10].h - r[0] * (state_link[0].h - state_link[1].h))\
-        / (state_gasp[1].h - state_link[1].h)
     eff = (1 - beta) * (state[1].h - state[2].h) /\
         ((state[1].h - state[12].h) + (1 - r[0]) * (state[3].h - state[2].h))
     # flow = alpha * Q * (state[1].h - state[12].h)
 
     # Check legality of results
     for result in [alpha, beta, *r, eff]:
-        if result <= 0 or result >= 1:
+        if result < 0 or result >= 1:
             raise ValueError("Illegal result.")
     if sum(r) >= 1:
         raise ValueError("Illegal result.")
@@ -103,20 +125,22 @@ def inner_iteration(para, graph=False, print_all=False):
         raise ValueError("Illegal result.")
     
     # Print key parameters
-    print("\nalpha = {:.4f}".format(alpha))
-    print("beta = {:.4f}".format(beta))
-    print("r1 = {:.4f}\tr2 = {:.4f}".format(*r))
-    print("enthalpy rise:\n\t9-10: {:.2f}\n\t10-11: {:.2f}\n\t11-12: {:.2f}\n".format(
-        *[state[i+1].h - state[i].h for i in range(9, 12)]))
-    print(
-        f"{Fore.RED}efficiency = {eff:.4f}{Style.RESET_ALL}")
+    if print_key:
+        print("\nalpha = {:.4f}".format(alpha))
+        print("beta = {:.4f}".format(beta))
+        print("r1 = {:.4f}\tr2 = {:.4f}".format(*r))
+        print("enthalpy rise:\n\t9-10: {:.2f}\n\t10-11: {:.2f}\n\t11-12: {:.2f}\n".format(
+            *[state[i+1].h - state[i].h for i in range(9, 12)]))
+        print(
+            f"{Fore.RED}efficiency = {eff:.4f}{Style.RESET_ALL}")
 
     # T-s Diagram
     if graph:
         ts_diagram(state, state_gasp)
 
     if print_all:
-        with open('best_parameters.csv', 'w', newline='') as file:
+        tag = 0 if print_all is True else print_all
+        with open('best_parameters{}.csv'.format(tag), 'w', newline='') as file:
             writer = csv.writer(file)
             title = [f'state', f'p / MPa', f't / degC', f'h / [J/kg]', f's / [J/(kg*K)]']
             writer.writerow(title)
@@ -129,7 +153,7 @@ def inner_iteration(para, graph=False, print_all=False):
             for idx, g in enumerate(state_gasp):
                 row = [f'gasp[{idx}]', g.p, g.t, g.h, g.s]
                 writer.writerow(row)
-            for l in state_link:
+            for idx, l in enumerate(state_link):
                 row = [f'link[{idx}]', l.p, l.t, l.h, l.s]
                 writer.writerow(row)
             name = ['alpha', 'beta', 'r[0]', 'r[1]', 'eff']

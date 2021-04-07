@@ -5,21 +5,20 @@ Course: NU317 Thermodynamic Design and Practise
 Author: Zikang Li
 Date: 2021 Spring
 """
-import pip
+# import pip
 
-modules = ["thermostate", "matplotlib", "numpy", "colorama"]
-try:
-    for module in modules:
-        pip.main(["install", module])
-except:
-    print("Pip Failed.")
+# try:
+#     pip.main(["install", "-i", "https://pypi.douban.com/simple", "-r", "requirements.txt"])
+# except:
+#     print("Pip Failed.")
 
 from iteration import inner_iteration
 import optimization
 
+from numpy import linspace
 import colorama
 from colorama import Fore, Style
-from time import time
+from time import time, sleep
 import json
 import os
 
@@ -32,18 +31,42 @@ state_low = json.loads(open("input-low.json").read())
 state_high = json.loads(open("input-high.json").read())
 
 # Outer Iteration
-def outer_iteration(s_mid, s_low=None, s_high=None, optm=None):
+def outer_iteration(s_mid=None, s_low=None, s_high=None, optm=None):
 
     # Run inner iteration
 
     # Option 1: Single State Solver
     if s_low is None and s_high is None:
-        inner_iteration(s_mid, graph=True)
+        inner_iteration(s_mid, graph=True, print_all=True)
     
     # Option 2: Greedy Algorithm Optimized Solver
-    elif optm == 'pa':
-        pa = optimization.GreedyAlgo(s_mid, s_low, s_high)
-        best = pa.loop()
+    elif optm == 'greedy':
+        # Iterate the GreedyAlgo - Yikai Wu
+        # mid_copy = s_mid.copy()
+        # space = linspace(0.1, 0.9, 9)
+        best = s_mid
+        best_score = 0.01
+        new_score = 0.10
+        while abs(new_score - best_score) / best_score > 0.01:
+            greedy = optimization.GreedyAlgo(best, s_low, s_high)
+            best = greedy.loop()
+            best_score = new_score
+            new_score = greedy.best_score
+        # for pr1 in space:
+        #     for pr2 in space:
+        #         print(f"\n{Fore.RED}r1_pointer={pr1}\tr2_pointer={pr2}{Style.RESET_ALL}\n")
+        #         sleep(3)
+        #         mid_copy['pr'] = [pr1, pr2]
+        #         best = s_mid
+        #         best_score = 0.01
+        #         new_score = 0.10
+        #         while abs(new_score - best_score) / best_score > 0.01:
+        #             greedy = optimization.GreedyAlgo(best, s_low, s_high)
+        #             best = greedy.loop()
+        #             best_score = new_score
+        #             new_score = greedy.best_score
+        #         if new_score > 0.3944:
+        #             inner_iteration(best, graph=True, print_all=True)
         with open('output.json', 'w') as o:
             o.write(json.dumps(best, indent=4))
         print(
@@ -53,8 +76,8 @@ def outer_iteration(s_mid, s_low=None, s_high=None, optm=None):
         inner_iteration(best, graph=True, print_all=True)
     
     # Option 3: Genetic Algorithm Optimized Solver
-    elif optm == 'ga':
-        pass
+    elif optm == 'genetic':
+        genetic = optimization.GeneticAlgo(s_low, s_high)
     
     else:
         raise ValueError("Outer iteration parameters error.")
@@ -71,9 +94,9 @@ def main():
     if opt == '1':
         outer_iteration(state_mid)
     elif opt == '2':
-        outer_iteration(state_mid, state_low, state_high, 'pa')
+        outer_iteration(state_mid, state_low, state_high, 'greedy')
     elif opt == '3':
-        print("Not available now.")
+        outer_iteration(state_mid, state_low, state_high, 'genetic')
     else:
         print(
             f"{Fore.RED}Invalid Choice.{Style.RESET_ALL}")

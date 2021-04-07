@@ -1,0 +1,5 @@
+colorama==0.4.3
+CoolProp==6.4.1
+matplotlib==3.3.4
+numpy==1.18.1
+thermostate==1.2.1
